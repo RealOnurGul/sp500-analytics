@@ -1,6 +1,6 @@
 # S&P 500 Data Pipeline
 
-Data foundation for a long-lived S&P 500 stock dashboard: ingestion, canonical storage, and derived summaries. No UI yet; everything is stored for fast backend and frontend queries later.
+Data foundation and web app for a long-lived S&P 500 stock dashboard: Python pipeline for ingestion and CSV storage, plus a Next.js TradingView-like frontend in `/web` to browse and chart stocks.
 
 ## Setup
 
@@ -13,6 +13,18 @@ Data foundation for a long-lived S&P 500 stock dashboard: ingestion, canonical s
    ```
 
 2. Run from the project root (the directory containing `pipeline/` and `data/`).
+
+## Web app (Next.js)
+
+To run the TradingView-like frontend that reads the same CSV data:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). You can search tickers, select a stock, and view candlestick charts with range buttons (1M, 3M, 6M, 1Y, 5Y, MAX). The app uses Next.js API routes to read from the repo `data/` folder; no separate backend is required.
 
 ## Two steps: ticker list vs price updates
 
