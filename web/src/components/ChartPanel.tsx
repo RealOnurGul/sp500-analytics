@@ -80,8 +80,8 @@ export function ChartPanel({
 
   return (
     <section
-      className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-sm transition ${
-        active ? "ring-2 ring-[var(--accent)]" : "hover:border-[var(--text-muted)]/30"
+      className={`flex min-h-0 min-w-0 flex-col overflow-hidden bg-[var(--surface)] p-2 transition ${
+        active ? "ring-2 ring-[var(--accent)] ring-inset" : "hover:bg-gray-50"
       }`}
       onClick={onClick}
       role="button"
@@ -93,22 +93,22 @@ export function ChartPanel({
         }
       }}
     >
-      <div className="mb-2 flex items-center justify-between text-xs text-[var(--text-muted)]">
+      <div className="mb-1 flex items-center justify-between text-xs text-[var(--text-muted)]">
         <span className="font-medium text-[var(--text)]">{ticker ?? "No symbol selected"}</span>
       </div>
 
       {ticker && (
-        <StatsRow ticker={ticker} stats={stats} className="mb-2 text-xs" />
+        <StatsRow ticker={ticker} stats={stats} className="mb-1 text-xs" />
       )}
 
       {error && (
-        <div className="mb-2 rounded border border-[var(--red)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--red)]">
+        <div className="mb-1 rounded border border-[var(--red)] bg-[var(--surface)] px-2 py-0.5 text-xs text-[var(--red)]">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex min-h-[200px] flex-1 items-center justify-center text-[var(--text-muted)]">
+        <div className="flex min-h-[120px] flex-1 items-center justify-center text-[var(--text-muted)]">
           Loading...
         </div>
       ) : ticker && candles.length > 0 ? (
@@ -126,11 +126,11 @@ export function ChartPanel({
           />
         </div>
       ) : ticker ? (
-        <div className="flex min-h-[200px] flex-1 items-center justify-center text-[var(--text-muted)]">
+        <div className="flex min-h-[120px] flex-1 items-center justify-center text-[var(--text-muted)]">
           No chart data for this range.
         </div>
       ) : (
-        <div className="flex min-h-[200px] flex-1 items-center justify-center text-[var(--text-muted)]">
+        <div className="flex min-h-[120px] flex-1 items-center justify-center text-[var(--text-muted)]">
           Select a ticker for this panel.
         </div>
       )}

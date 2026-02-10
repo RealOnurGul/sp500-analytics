@@ -375,7 +375,7 @@ export function CandlesChart({
   return (
     <div className={`flex min-h-0 flex-1 flex-col ${className}`}>
       {info && (
-        <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-[var(--text)]">
+        <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text)]">
           <span className="font-semibold">{ticker}</span>
           <span className="text-[var(--text-muted)]">{info.time}</span>
           {info.open != null && (
@@ -403,16 +403,16 @@ export function CandlesChart({
           </span>
         </div>
       )}
-      <div className="mb-2 flex justify-end">
+      <div className="mb-1 flex justify-end">
         <button
           type="button"
           onClick={() => setShowVolume((v) => !v)}
-          className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs text-[var(--text)] hover:bg-gray-100"
+          className="rounded border border-[var(--border)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] text-[var(--text)] hover:bg-gray-100"
         >
           {showVolume ? "Hide volume" : "Show volume"}
         </button>
       </div>
-      <div ref={containerRef} className="relative min-h-[200px] w-full flex-1">
+      <div ref={containerRef} className="relative min-h-[120px] w-full flex-1">
         {showVolume && (
           <div
             className="absolute left-0 right-0 h-1 cursor-row-resize bg-[var(--border)]/70"

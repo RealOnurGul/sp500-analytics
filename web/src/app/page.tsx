@@ -146,21 +146,21 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <LeftSidebar onOpenSearch={openSearch} />
 
-      <div className="flex min-w-0 flex-1">
-        <main className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           {/* Top bar */}
-          <header className="flex shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+          <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-2 py-1.5">
             <LayoutSelector value={layout} onChange={setLayout} />
             <SyncControls sync={sync} onChange={setSync} />
             <div className="flex-1" />
           </header>
 
-          {/* Chart grid - takes remaining height */}
+          {/* Chart grid: minimal gap, fills viewport, no scroll */}
           <div
-            className={`grid flex-1 auto-rows-fr gap-3 overflow-auto p-4 ${gridClassForLayout(
+            className={`grid flex-1 auto-rows-fr gap-px overflow-hidden bg-[var(--border)] p-1 ${gridClassForLayout(
               layout
             )}`}
             style={{ minHeight: 0 }}
@@ -189,7 +189,7 @@ export default function Home() {
           </div>
 
           {/* Bottom bar: time range for all charts (bottom left) */}
-          <footer className="flex shrink-0 items-center border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+          <footer className="flex shrink-0 items-center border-t border-[var(--border)] bg-[var(--surface)] px-2 py-1">
             <div className="flex items-center gap-1">
               <span className="mr-2 text-xs text-[var(--text-muted)]">Time range</span>
               <RangeButtons value={range} onChange={setRange} className="flex-wrap gap-1" />
@@ -197,8 +197,8 @@ export default function Home() {
           </footer>
         </main>
 
-        {/* Right watchlist panel */} 
-        <aside className="w-72 shrink-0 border-l border-[var(--border)] bg-[var(--surface)]">
+        {/* Right watchlist panel */}
+        <aside className="w-64 shrink-0 border-l border-[var(--border)] bg-[var(--surface)] overflow-auto">
           <Watchlist
             onSelectTicker={(t) => {
               // apply to active chart panel
