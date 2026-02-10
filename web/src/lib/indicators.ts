@@ -7,6 +7,28 @@ export const EMA_RIBBON_PERIODS = [8, 13, 21, 34, 55, 89, 144] as const;
 export const EMA_50_PERIOD = 50;
 export const EMA_200_PERIOD = 200;
 
+/** Opacity for each ribbon line (index 0 = EMA 8 most visible, 6 = EMA 144 least visible). */
+export const RIBBON_OPACITIES = [0.9, 0.78, 0.65, 0.52, 0.38, 0.25, 0.15] as const;
+
+/**
+ * Option A: Trend regime from slope of EMA 8.
+ * Bullish if EMA8[t] > EMA8[t-1], bearish if <; if equal, keep previous to avoid flicker.
+ */
+export function ema8SlopeRegime(ema8: (number | null)[]): ("bullish" | "bearish")[] {
+  const out: ("bullish" | "bearish")[] = new Array(ema8.length);
+  let prev: "bullish" | "bearish" = "bullish";
+  for (let i = 0; i < ema8.length; i++) {
+    const curr = ema8[i];
+    const prevVal = i > 0 ? ema8[i - 1] : null;
+    if (curr != null && prevVal != null) {
+      if (curr > prevVal) prev = "bullish";
+      else if (curr < prevVal) prev = "bearish";
+    }
+    out[i] = prev;
+  }
+  return out;
+}
+
 export function ema(close: number[], period: number): (number | null)[] {
   const out: (number | null)[] = new Array(close.length);
   const k = 2 / (period + 1);

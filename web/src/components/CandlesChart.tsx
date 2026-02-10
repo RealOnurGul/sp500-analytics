@@ -18,7 +18,9 @@ import {
   bollingerBands,
   parabolicSAR,
   sarFlipMarkers,
+  ema8SlopeRegime,
   EMA_RIBBON_PERIODS,
+  RIBBON_OPACITIES,
   EMA_50_PERIOD,
   EMA_200_PERIOD,
 } from "@/lib/indicators";
@@ -44,6 +46,27 @@ function toLineData(times: string[], values: (number | null)[]): LineData[] {
     if (values[i] != null && !Number.isNaN(values[i]!)) {
       out.push({ time: times[i] as string, value: values[i]! });
     }
+  }
+  return out;
+}
+
+/** TradingView-style ribbon: per-point color from regime + opacity by line index. */
+function toRibbonLineData(
+  times: string[],
+  values: (number | null)[],
+  regime: ("bullish" | "bearish")[],
+  lineIndex: number
+): LineData[] {
+  const opacity = RIBBON_OPACITIES[Math.min(lineIndex, RIBBON_OPACITIES.length - 1)];
+  const out: LineData[] = [];
+  for (let i = 0; i < times.length; i++) {
+    if (values[i] == null || Number.isNaN(values[i]!)) continue;
+    const r = regime[i];
+    const color =
+      r === "bullish"
+        ? `rgba(124, 58, 237, ${opacity})` // purple/blue
+        : `rgba(220, 38, 127, ${opacity})`; // red/magenta
+    out.push({ time: times[i] as string, value: values[i]!, color });
   }
   return out;
 }
@@ -87,7 +110,7 @@ function formatNum(value: number | undefined, decimals = 2): string {
 }
 
 const INDICATOR_COLORS = {
-  ribbon: ["#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe", "#f5f3ff"],
+  /** EMA 50/200 constant colors (not regime-based). */
   ema50: "#eab308",
   ema200: "#f97316",
   bollinger: "#64748b",
@@ -181,11 +204,16 @@ export function CandlesChart({
     const low = candles.map((c) => c.low);
     const times = candles.map((c) => c.time);
     const sarValues = (ind.sar || ind.buySellMarkers) ? parabolicSAR(high, low, close) : null;
+    const ema8 = ind.emaRibbon ? ema(close, 8) : null;
+    const regime = ema8 ? ema8SlopeRegime(ema8) : null;
     return {
       times,
-      ribbon: ind.emaRibbon
-        ? EMA_RIBBON_PERIODS.map((p) => toLineData(times, ema(close, p)))
-        : [],
+      ribbon:
+        ind.emaRibbon && regime
+          ? EMA_RIBBON_PERIODS.map((p, lineIndex) =>
+              toRibbonLineData(times, ema(close, p), regime, lineIndex)
+            )
+          : [],
       ema50: ind.ema50 ? toLineData(times, ema(close, EMA_50_PERIOD)) : [],
       ema200: ind.ema200 ? toLineData(times, ema(close, EMA_200_PERIOD)) : [],
       bollinger: ind.bollinger ? bollingerBands(close, 20, 2) : null,
@@ -301,14 +329,14 @@ export function CandlesChart({
 
     const { times, ribbon, ema50, ema200, bollinger, sar, markers } = indicatorData;
 
-    // EMA Ribbon
+    // EMA Ribbon (slope-based regime color, opacity gradient, EMA8 thicker)
     if (ind.emaRibbon) {
       if (ribbonSeriesRef.current.length !== ribbon.length) {
         ribbonSeriesRef.current.forEach((s) => chart.removeSeries(s));
         ribbonSeriesRef.current = ribbon.map((_, i) =>
           chart.addLineSeries({
-            color: INDICATOR_COLORS.ribbon[i % INDICATOR_COLORS.ribbon.length],
-            lineWidth: 1,
+            color: "rgba(124, 58, 237, 0.6)",
+            lineWidth: i === 0 ? 2 : 1,
             priceLineVisible: false,
             lastValueVisible: false,
           })
@@ -343,7 +371,7 @@ export function CandlesChart({
       if (!ema200SeriesRef.current) {
         ema200SeriesRef.current = chart.addLineSeries({
           color: INDICATOR_COLORS.ema200,
-          lineWidth: 2,
+          lineWidth: 3,
           priceLineVisible: false,
           lastValueVisible: true,
         });
