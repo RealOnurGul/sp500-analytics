@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import {
   createChart,
   ColorType,
+  CrosshairMode,
   IChartApi,
   ISeriesApi,
   CandlestickData,
@@ -114,6 +115,9 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
         background: { type: ColorType.Solid, color: "#ffffff" },
         textColor: "#0f172a",
       },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+      },
       grid: {
         vertLines: { color: "#e2e8f0" },
         horzLines: { color: "#e2e8f0" },
@@ -221,8 +225,8 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
     const chart = chartRef.current;
 
     const handler = (param: any) => {
+      // If we are not over a candle, keep the last hovered value
       if (!param || !param.time) {
-        setHoverInfo(null);
         return;
       }
       const time = String(param.time);
