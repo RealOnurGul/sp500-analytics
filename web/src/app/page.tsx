@@ -158,7 +158,7 @@ export default function Home() {
                 Loading...
               </div>
             ) : candles.length > 0 ? (
-              <CandlesChart candles={candles} />
+              <CandlesChart ticker={selectedTicker ?? undefined} candles={candles} />
             ) : selectedTicker ? (
               <div className="flex h-[400px] items-center justify-center text-[var(--text-muted)]">
                 No chart data for this range.

@@ -20,6 +20,7 @@ export interface Candle {
 }
 
 interface CandlesChartProps {
+  ticker?: string;
   candles: Candle[];
   className?: string;
 }
@@ -27,7 +28,24 @@ interface CandlesChartProps {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
-export function CandlesChart({ candles, className = "" }: CandlesChartProps) {
+interface HoverInfo {
+  time: string;
+  open?: number;
+  high?: number;
+  low?: number;
+  close: number;
+  changePct?: number;
+}
+
+function formatNum(value: number | undefined, decimals = 2): string {
+  if (value == null || Number.isNaN(value)) return "–";
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+export function CandlesChart({ ticker, candles, className = "" }: CandlesChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -39,6 +57,7 @@ export function CandlesChart({ candles, className = "" }: CandlesChartProps) {
 
   const isDraggingRef = useRef(false);
   const lastYRef = useRef<number | null>(null);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
   const candleData: CandlestickData[] = useMemo(
     () =>
@@ -61,6 +80,31 @@ export function CandlesChart({ candles, className = "" }: CandlesChartProps) {
       })),
     [candles]
   );
+
+  const candleByTime = useMemo(() => {
+    const map = new Map<string, Candle>();
+    candles.forEach((c) => {
+      map.set(c.time, c);
+    });
+    return map;
+  }, [candles]);
+
+  const defaultInfo: HoverInfo | null = useMemo(() => {
+    if (candles.length === 0) return null;
+    const last = candles[candles.length - 1];
+    const changePct =
+      last.open != null && last.open !== 0
+        ? ((last.close - last.open) / last.open) * 100
+        : undefined;
+    return {
+      time: last.time,
+      open: last.open,
+      high: last.high,
+      low: last.low,
+      close: last.close,
+      changePct,
+    };
+  }, [candles]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -171,6 +215,42 @@ export function CandlesChart({ candles, className = "" }: CandlesChartProps) {
     });
   }, [showVolume, volumeHeight]);
 
+  // Crosshair move: update hover info without recreating chart
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const chart = chartRef.current;
+
+    const handler = (param: any) => {
+      if (!param || !param.time) {
+        setHoverInfo(null);
+        return;
+      }
+      const time = String(param.time);
+      const candle = candleByTime.get(time);
+      if (!candle) {
+        setHoverInfo(null);
+        return;
+      }
+      const changePct =
+        candle.open != null && candle.open !== 0
+          ? ((candle.close - candle.open) / candle.open) * 100
+          : undefined;
+      setHoverInfo({
+        time: candle.time,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        changePct,
+      });
+    };
+
+    chart.subscribeCrosshairMove(handler);
+    return () => {
+      chart.unsubscribeCrosshairMove(handler);
+    };
+  }, [candleByTime]);
+
   const handleDragStart = useCallback((event: React.MouseEvent) => {
     if (!showVolume) return;
     isDraggingRef.current = true;
@@ -198,8 +278,45 @@ export function CandlesChart({ candles, className = "" }: CandlesChartProps) {
     window.addEventListener("mouseup", handleUp);
   }, [showVolume]);
 
+  const info = hoverInfo ?? defaultInfo;
+  const changeClass =
+    info && info.changePct != null
+      ? info.changePct >= 0
+        ? "text-[var(--green)]"
+        : "text-[var(--red)]"
+      : "text-[var(--text-muted)]";
+
   return (
     <div className={className}>
+      {info && (
+        <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-[var(--text)]">
+          <span className="font-semibold">{ticker}</span>
+          <span className="text-[var(--text-muted)]">{info.time}</span>
+          {info.open != null && (
+            <span>
+              O: <span className="font-medium">{formatNum(info.open)}</span>
+            </span>
+          )}
+          {info.high != null && (
+            <span>
+              H: <span className="font-medium">{formatNum(info.high)}</span>
+            </span>
+          )}
+          {info.low != null && (
+            <span>
+              L: <span className="font-medium">{formatNum(info.low)}</span>
+            </span>
+          )}
+          <span>
+            C: <span className="font-medium">{formatNum(info.close)}</span>
+          </span>
+          <span className={changeClass}>
+            {info.changePct != null
+              ? `${info.changePct >= 0 ? "+" : ""}${formatNum(info.changePct)}%`
+              : "–%"}
+          </span>
+        </div>
+      )}
       <div className="mb-2 flex justify-end">
         <button
           type="button"
