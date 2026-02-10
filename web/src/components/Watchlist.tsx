@@ -35,6 +35,14 @@ export function Watchlist({ onSelectTicker, onRequestSearchForAdd }: WatchlistPr
       items: [
         { id: "aapl", ticker: "AAPL" },
         { id: "amzn", ticker: "AMZN" },
+        { id: "nvda", ticker: "NVDA" },
+        { id: "googl", ticker: "GOOGL" },
+        { id: "msft", ticker: "MSFT" },
+        { id: "avgo", ticker: "AVGO" },
+        { id: "meta", ticker: "META" },
+        { id: "tsla", ticker: "TSLA" },
+        { id: "brk-b", ticker: "BRK-B" },
+        { id: "lly", ticker: "LLY" },
       ],
     },
   ]);
