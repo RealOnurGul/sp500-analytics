@@ -3,16 +3,66 @@
 @tailwind utilities;
 
 :root {
-  --bg: #f5f7fa;
+  --bg: #f0f2f5;
   --surface: #ffffff;
-  --border: #e2e8f0;
-  --text: #0f172a;
-  --text-muted: #64748b;
-  --green: #16a34a;
-  --red: #dc2626;
+  --surface-elevated: #ffffff;
+  --border: #e1e5eb;
+  --border-light: #eef0f3;
+  --text: #131722;
+  --text-muted: #787b86;
+  --green: #089981;
+  --red: #f23645;
+  --accent: #2962ff;
+  --accent-fg: #ffffff;
+  --hover: #f0f2f5;
+  /* Left sidebar (TradingView-style) */
+  --sidebar-bg: #131722;
+  --sidebar-surface: #1e222d;
+  --sidebar-border: #2a2e39;
+  --sidebar-text: #d1d4dc;
+  --sidebar-text-muted: #787b86;
+  --sidebar-hover: #2a2e39;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
+
+/* Chart / main area toolbar buttons */
+.chart-toolbar-btn {
+  @apply rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--text)] transition;
+}
+.chart-toolbar-btn:hover {
+  background: var(--hover);
+  border-color: var(--text-muted);
+}
+
+.chart-dropdown {
+  @apply border border-[var(--border)] bg-[var(--surface)] shadow-lg;
+}
+
+/* Sidebar menu item */
+.sidebar-menu-item {
+  @apply flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition;
+  @apply text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover)];
+}
+
+.sidebar-menu-item.active {
+  @apply bg-[var(--sidebar-hover)] font-medium text-white;
+}
+
+/* Range buttons in chart area */
+.range-btn {
+  @apply rounded px-2.5 py-1.5 text-xs font-medium transition;
+}
+
+.range-btn.active {
+  @apply bg-[var(--text)] text-[var(--surface)];
+}
+
+.range-btn:not(.active) {
+  @apply bg-[var(--surface)] text-[var(--text-muted)] hover:bg-[var(--border)] hover:text-[var(--text)];
+}
+

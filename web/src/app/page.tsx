@@ -1,12 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RangeButtons, type RangeKey } from "@/components/RangeButtons";
-import { StatsRow } from "@/components/StatsRow";
-import { CandlesChart, type Candle } from "@/components/CandlesChart";
 import type { TickerOption } from "@/components/SearchTicker";
 import { SearchOverlay } from "@/components/SearchOverlay";
+import { LeftSidebar } from "@/components/LeftSidebar";
+import { ChartPanel } from "@/components/ChartPanel";
 import { Watchlist } from "@/components/Watchlist";
+import {
+  LayoutSelector,
+  type LayoutKey,
+  panelCountForLayout,
+  gridClassForLayout,
+} from "@/components/LayoutSelector";
 
 function getDefaultTicker(options: TickerOption[]): string | null {
   if (options.length === 0) return null;
@@ -17,49 +23,41 @@ function getDefaultTicker(options: TickerOption[]): string | null {
   return options[0].ticker;
 }
 
+const DEFAULT_LAYOUT: LayoutKey = "1";
+
 export default function Home() {
   const [tickerOptions, setTickerOptions] = useState<TickerOption[]>([]);
-  const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [range, setRange] = useState<RangeKey>("1Y");
-  const [candles, setCandles] = useState<Candle[]>([]);
-  const [stats, setStats] = useState<{
-    lastClose: number;
-    lastVolume: number;
-    lastDate: string;
-    change1dPct: number | null;
-  } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [layout, setLayout] = useState<LayoutKey>(DEFAULT_LAYOUT);
+  const [panels, setPanels] = useState<Array<{ id: string; ticker: string | null }>>([
+    { id: "panel-1", ticker: null },
+  ]);
+  const [activePanelId, setActivePanelId] = useState<string>("panel-1");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchInitialQuery, setSearchInitialQuery] = useState("");
   const [searchMode, setSearchMode] = useState<"chart" | "watchlist">("chart");
   const pendingWatchlistAdd = useRef<((ticker: string) => void) | null>(null);
 
-  const fetchPrices = useCallback(async (t: string, r: RangeKey) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/prices?ticker=${encodeURIComponent(t)}&range=${encodeURIComponent(r)}`
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setError(err.error || "Failed to load prices");
-        setCandles([]);
-        setStats(null);
-        return;
+  const panelCount = panelCountForLayout(layout);
+
+  // Keep panels array in sync with layout
+  useEffect(() => {
+    setPanels((prev) => {
+      const next: Array<{ id: string; ticker: string | null }> = [];
+      for (let i = 0; i < panelCount; i++) {
+        const existing = prev[i];
+        next.push({
+          id: existing?.id ?? `panel-${i + 1}`,
+          ticker: existing?.ticker ?? null,
+        });
       }
-      const data = await res.json();
-      setCandles(data.candles || []);
-      setStats(data.stats || null);
-    } catch (e) {
-      setError("Failed to load prices");
-      setCandles([]);
-      setStats(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return next;
+    });
+    setActivePanelId((prev) => {
+      const firstId = `panel-1`;
+      return prev && panelCount >= 1 ? prev : firstId;
+    });
+  }, [panelCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,11 +66,14 @@ export default function Home() {
       .then((list: TickerOption[]) => {
         if (cancelled || !Array.isArray(list)) return;
         setTickerOptions(list);
-        setSelectedTicker((prev) => {
-          if (prev) return prev;
-          const defaultT = getDefaultTicker(list);
-          return defaultT ?? null;
-        });
+        const defaultT = getDefaultTicker(list);
+        if (defaultT) {
+          setPanels((prev) =>
+            prev.map((p, index) =>
+              index === 0 && p.ticker == null ? { ...p, ticker: defaultT } : p
+            )
+          );
+        }
       })
       .catch(() => {});
     return () => {
@@ -80,7 +81,6 @@ export default function Home() {
     };
   }, []);
 
-  // Global key handler: start typing to open search overlay
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (searchOpen) return;
@@ -105,75 +105,69 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handler);
   }, [searchOpen]);
 
-  useEffect(() => {
-    if (!selectedTicker) return;
-    fetchPrices(selectedTicker, range);
-  }, [selectedTicker, range, fetchPrices]);
+  const setActivePanelTicker = (ticker: string) => {
+    setPanels((prev) =>
+      prev.map((p) => (p.id === activePanelId ? { ...p, ticker } : p))
+    );
+  };
 
-  const handleSelectTicker = (t: string) => {
-    setSelectedTicker(t);
+  const openSearch = (mode: "chart" | "watchlist") => {
+    setSearchMode(mode);
+    pendingWatchlistAdd.current = null;
+    setSearchInitialQuery("");
+    setSearchOpen(true);
   };
 
   return (
-    <main className="min-h-screen p-4 md:p-6">
-      <div className="mx-auto flex max-w-7xl gap-4">
-        <div className="flex-1">
-          <header className="mb-6 flex flex-wrap items-center gap-4 border-b border-[var(--border)] pb-4">
-            <h1 className="text-xl font-semibold">S&P 500</h1>
-            <button
-              type="button"
-              onClick={() => {
-                setSearchMode("chart");
-                pendingWatchlistAdd.current = null;
-                setSearchInitialQuery("");
-                setSearchOpen(true);
-              }}
-              className="flex items-center gap-2 rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text-muted)] hover:bg-[var(--border)]/60"
-            >
-              <span>Search symbols</span>
-              <span className="text-[10px] text-[var(--text-muted)]">
-                Type to open
-              </span>
-            </button>
-            <RangeButtons value={range} onChange={setRange} />
+    <div className="flex min-h-screen">
+      <LeftSidebar onOpenSearch={openSearch} />
+
+      <div className="flex min-w-0 flex-1">
+        <main className="flex min-w-0 flex-1 flex-col">
+          {/* Top bar */}
+          <header className="flex shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+            <LayoutSelector value={layout} onChange={setLayout} />
+            <div className="flex-1" />
           </header>
 
-          {error && (
-            <div className="mb-4 rounded border border-[var(--red)] bg-[var(--surface)] px-4 py-2 text-sm text-[var(--red)]">
-              {error}
+          {/* Chart grid - takes remaining height */}
+          <div
+            className={`grid flex-1 auto-rows-fr gap-3 overflow-auto p-4 ${gridClassForLayout(
+              layout
+            )}`}
+            style={{ minHeight: 0 }}
+          >
+            {panels.map((panel) => (
+              <ChartPanel
+                key={panel.id}
+                id={panel.id}
+                ticker={panel.ticker}
+                range={range}
+                active={panel.id === activePanelId}
+                onClick={() => setActivePanelId(panel.id)}
+              />
+            ))}
+          </div>
+
+          {/* Bottom bar: time range for all charts (bottom left) */}
+          <footer className="flex shrink-0 items-center border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+            <div className="flex items-center gap-1">
+              <span className="mr-2 text-xs text-[var(--text-muted)]">Time range</span>
+              <RangeButtons value={range} onChange={setRange} className="flex-wrap gap-1" />
             </div>
-          )}
+          </footer>
+        </main>
 
-          {selectedTicker && (
-            <StatsRow
-              ticker={selectedTicker}
-              stats={stats}
-              className="mb-4"
-            />
-          )}
-
-          <section className="rounded border border-[var(--border)] bg-[var(--surface)] p-4">
-            {loading ? (
-              <div className="flex h-[400px] items-center justify-center text-[var(--text-muted)]">
-                Loading...
-              </div>
-            ) : candles.length > 0 ? (
-              <CandlesChart ticker={selectedTicker ?? undefined} candles={candles} />
-            ) : selectedTicker ? (
-              <div className="flex h-[400px] items-center justify-center text-[var(--text-muted)]">
-                No chart data for this range.
-              </div>
-            ) : (
-              <div className="flex h-[400px] items-center justify-center text-[var(--text-muted)]">
-                Search and select a ticker to view the chart.
-              </div>
-            )}
-          </section>
-        </div>
-        <div className="w-72 shrink-0">
+        {/* Right watchlist panel */} 
+        <aside className="w-72 shrink-0 border-l border-[var(--border)] bg-[var(--surface)]">
           <Watchlist
             onSelectTicker={(t) => {
-              setSelectedTicker(t);
+              // apply to active chart panel
+              setPanels((prev) =>
+                prev.map((p) =>
+                  p.id === activePanelId ? { ...p, ticker: t } : p
+                )
+              );
             }}
             onRequestSearchForAdd={(addToFolder) => {
               pendingWatchlistAdd.current = addToFolder;
@@ -182,7 +176,7 @@ export default function Home() {
               setSearchOpen(true);
             }}
           />
-        </div>
+        </aside>
       </div>
 
       <SearchOverlay
@@ -195,17 +189,15 @@ export default function Home() {
         }}
         onSelect={(t) => {
           if (searchMode === "chart") {
-            setSelectedTicker(t);
+            setActivePanelTicker(t);
           } else if (searchMode === "watchlist" && pendingWatchlistAdd.current) {
             pendingWatchlistAdd.current(t);
           }
-          // Always also select the ticker in the main chart
-          setSelectedTicker(t);
           setSearchOpen(false);
           setSearchMode("chart");
           pendingWatchlistAdd.current = null;
         }}
       />
-    </main>
+    </div>
   );
 }

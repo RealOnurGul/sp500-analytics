@@ -26,11 +26,7 @@ export function RangeButtons({
           key={r}
           type="button"
           onClick={() => onChange(r)}
-          className={`rounded px-3 py-1.5 text-sm font-medium transition ${
-            value === r
-              ? "bg-[var(--text-muted)] text-[var(--bg)]"
-              : "bg-[var(--surface)] text-[var(--text)] hover:bg-[var(--border)]"
-          }`}
+          className={value === r ? "range-btn active" : "range-btn"}
         >
           {r}
         </button>
