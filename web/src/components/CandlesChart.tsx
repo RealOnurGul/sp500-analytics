@@ -9,7 +9,19 @@ import {
   ISeriesApi,
   CandlestickData,
   HistogramData,
+  LineData,
+  LineStyle,
 } from "lightweight-charts";
+import type { IndicatorState } from "./IndicatorControls";
+import {
+  ema,
+  bollingerBands,
+  parabolicSAR,
+  sarFlipMarkers,
+  EMA_RIBBON_PERIODS,
+  EMA_50_PERIOD,
+  EMA_200_PERIOD,
+} from "@/lib/indicators";
 
 export interface Candle {
   time: string;
@@ -25,9 +37,21 @@ export interface VisibleRange {
   to: number;
 }
 
+/** LineData point for indicators */
+function toLineData(times: string[], values: (number | null)[]): LineData[] {
+  const out: LineData[] = [];
+  for (let i = 0; i < times.length; i++) {
+    if (values[i] != null && !Number.isNaN(values[i]!)) {
+      out.push({ time: times[i] as string, value: values[i]! });
+    }
+  }
+  return out;
+}
+
 interface CandlesChartProps {
   ticker?: string;
   candles: Candle[];
+  indicators?: IndicatorState;
   className?: string;
   /** Sync: report crosshair time when user moves crosshair */
   onCrosshairMove?: (time: string) => void;
@@ -62,9 +86,19 @@ function formatNum(value: number | undefined, decimals = 2): string {
   });
 }
 
+const INDICATOR_COLORS = {
+  ribbon: ["#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe", "#f5f3ff"],
+  ema50: "#eab308",
+  ema200: "#f97316",
+  bollinger: "#64748b",
+  bollingerBand: "#94a3b8",
+  sar: "#06b6d4",
+};
+
 export function CandlesChart({
   ticker,
   candles,
+  indicators,
   className = "",
   onCrosshairMove,
   onVisibleRangeChange,
@@ -78,6 +112,11 @@ export function CandlesChart({
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const ribbonSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
+  const ema50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema200SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const bollingerSeriesRef = useRef<{ upper: ISeriesApi<"Line">; middle: ISeriesApi<"Line">; lower: ISeriesApi<"Line"> } | null>(null);
+  const sarSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const skipVisibleRangeRef = useRef(false);
 
   const [showVolume, setShowVolume] = useState(true);
@@ -133,6 +172,30 @@ export function CandlesChart({
       changePct,
     };
   }, [candles]);
+
+  const ind = indicators ?? { emaRibbon: false, ema50: true, ema200: true, bollinger: false, sar: false, buySellMarkers: false };
+  const indicatorData = useMemo(() => {
+    if (candles.length === 0) return null;
+    const close = candles.map((c) => c.close);
+    const high = candles.map((c) => c.high);
+    const low = candles.map((c) => c.low);
+    const times = candles.map((c) => c.time);
+    const sarValues = (ind.sar || ind.buySellMarkers) ? parabolicSAR(high, low, close) : null;
+    return {
+      times,
+      ribbon: ind.emaRibbon
+        ? EMA_RIBBON_PERIODS.map((p) => toLineData(times, ema(close, p)))
+        : [],
+      ema50: ind.ema50 ? toLineData(times, ema(close, EMA_50_PERIOD)) : [],
+      ema200: ind.ema200 ? toLineData(times, ema(close, EMA_200_PERIOD)) : [],
+      bollinger: ind.bollinger ? bollingerBands(close, 20, 2) : null,
+      sar: sarValues ? toLineData(times, sarValues) : [],
+      markers:
+        ind.buySellMarkers && sarValues
+          ? sarFlipMarkers(high, low, close, sarValues)
+          : null,
+    };
+  }, [candles, ind.emaRibbon, ind.ema50, ind.ema200, ind.bollinger, ind.sar, ind.buySellMarkers]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -209,6 +272,11 @@ export function CandlesChart({
       chartRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
+      ribbonSeriesRef.current = [];
+      ema50SeriesRef.current = null;
+      ema200SeriesRef.current = null;
+      bollingerSeriesRef.current = null;
+      sarSeriesRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chart created once on mount; data updated in separate effects
   }, []);
@@ -224,6 +292,144 @@ export function CandlesChart({
 
     chartRef.current?.timeScale().fitContent();
   }, [candleData, volumeData]);
+
+  // Indicator series: create/remove and update data
+  useEffect(() => {
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    if (!chart || !candleSeries || !indicatorData || candleData.length === 0) return;
+
+    const { times, ribbon, ema50, ema200, bollinger, sar, markers } = indicatorData;
+
+    // EMA Ribbon
+    if (ind.emaRibbon) {
+      if (ribbonSeriesRef.current.length !== ribbon.length) {
+        ribbonSeriesRef.current.forEach((s) => chart.removeSeries(s));
+        ribbonSeriesRef.current = ribbon.map((_, i) =>
+          chart.addLineSeries({
+            color: INDICATOR_COLORS.ribbon[i % INDICATOR_COLORS.ribbon.length],
+            lineWidth: 1,
+            priceLineVisible: false,
+            lastValueVisible: false,
+          })
+        );
+      }
+      ribbonSeriesRef.current.forEach((s, i) => s.setData(ribbon[i]));
+    } else {
+      ribbonSeriesRef.current.forEach((s) => chart.removeSeries(s));
+      ribbonSeriesRef.current = [];
+    }
+
+    // EMA 50
+    if (ind.ema50) {
+      if (!ema50SeriesRef.current) {
+        ema50SeriesRef.current = chart.addLineSeries({
+          color: INDICATOR_COLORS.ema50,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: true,
+        });
+      }
+      ema50SeriesRef.current.setData(ema50);
+    } else {
+      if (ema50SeriesRef.current) {
+        chart.removeSeries(ema50SeriesRef.current);
+        ema50SeriesRef.current = null;
+      }
+    }
+
+    // EMA 200
+    if (ind.ema200) {
+      if (!ema200SeriesRef.current) {
+        ema200SeriesRef.current = chart.addLineSeries({
+          color: INDICATOR_COLORS.ema200,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: true,
+        });
+      }
+      ema200SeriesRef.current.setData(ema200);
+    } else {
+      if (ema200SeriesRef.current) {
+        chart.removeSeries(ema200SeriesRef.current);
+        ema200SeriesRef.current = null;
+      }
+    }
+
+    // Bollinger Bands
+    if (ind.bollinger && bollinger) {
+      if (!bollingerSeriesRef.current) {
+        bollingerSeriesRef.current = {
+          upper: chart.addLineSeries({
+            color: INDICATOR_COLORS.bollingerBand,
+            lineWidth: 1,
+            priceLineVisible: false,
+            lastValueVisible: false,
+          }),
+          middle: chart.addLineSeries({
+            color: INDICATOR_COLORS.bollinger,
+            lineWidth: 1,
+            priceLineVisible: false,
+            lastValueVisible: false,
+          }),
+          lower: chart.addLineSeries({
+            color: INDICATOR_COLORS.bollingerBand,
+            lineWidth: 1,
+            priceLineVisible: false,
+            lastValueVisible: false,
+          }),
+        };
+      }
+      bollingerSeriesRef.current.upper.setData(toLineData(times, bollinger.upper));
+      bollingerSeriesRef.current.middle.setData(toLineData(times, bollinger.middle));
+      bollingerSeriesRef.current.lower.setData(toLineData(times, bollinger.lower));
+    } else {
+      if (bollingerSeriesRef.current) {
+        chart.removeSeries(bollingerSeriesRef.current.upper);
+        chart.removeSeries(bollingerSeriesRef.current.middle);
+        chart.removeSeries(bollingerSeriesRef.current.lower);
+        bollingerSeriesRef.current = null;
+      }
+    }
+
+    // Parabolic SAR
+    if (ind.sar) {
+      if (!sarSeriesRef.current) {
+        sarSeriesRef.current = chart.addLineSeries({
+          color: INDICATOR_COLORS.sar,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          lineStyle: LineStyle.Dashed,
+        });
+      }
+      sarSeriesRef.current.setData(sar);
+    } else {
+      if (sarSeriesRef.current) {
+        chart.removeSeries(sarSeriesRef.current);
+        sarSeriesRef.current = null;
+      }
+    }
+
+    // Buy/sell markers (from SAR flips)
+    if (markers && ind.buySellMarkers) {
+      const seriesMarkers = times
+        .map((time, i) => {
+          const m = markers[i];
+          if (!m) return null;
+          return {
+            time: time as string,
+            position: m === "buy" ? ("aboveBar" as const) : ("belowBar" as const),
+            shape: m === "buy" ? ("arrowUp" as const) : ("arrowDown" as const),
+            color: m === "buy" ? "#16a34a" : "#dc2626",
+          };
+        })
+        .filter(Boolean) as { time: string; position: "aboveBar" | "belowBar"; shape: "arrowUp" | "arrowDown"; color: string }[];
+      candleSeries.setMarkers(seriesMarkers);
+    } else {
+      candleSeries.setMarkers([]);
+    }
+  }, [candleData.length, indicatorData, ind.emaRibbon, ind.ema50, ind.ema200, ind.bollinger, ind.sar, ind.buySellMarkers]);
 
   // Apply layout for volume pane height (price chart stays stable)
   useEffect(() => {

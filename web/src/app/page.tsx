@@ -9,6 +9,11 @@ import { ChartPanel } from "@/components/ChartPanel";
 import { Watchlist } from "@/components/Watchlist";
 import { SyncControls, type SyncState } from "@/components/SyncControls";
 import {
+  IndicatorControls,
+  DEFAULT_INDICATORS,
+  type IndicatorState,
+} from "@/components/IndicatorControls";
+import {
   LayoutSelector,
   type LayoutKey,
   panelCountForLayout,
@@ -46,6 +51,7 @@ export default function Home() {
     time: false,
     dateRange: false,
   });
+  const [indicators, setIndicators] = useState<IndicatorState>(DEFAULT_INDICATORS);
   const [sharedCrosshairTime, setSharedCrosshairTime] = useState<string | null>(null);
   const [sharedVisibleRange, setSharedVisibleRange] = useState<{
     from: number;
@@ -155,6 +161,7 @@ export default function Home() {
           <header className="flex shrink-0 items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-2 py-1.5">
             <LayoutSelector value={layout} onChange={setLayout} />
             <SyncControls sync={sync} onChange={setSync} />
+            <IndicatorControls indicators={indicators} onChange={setIndicators} />
             <div className="flex-1" />
           </header>
 
@@ -173,6 +180,7 @@ export default function Home() {
                 range={range}
                 active={panel.id === activePanelId}
                 onClick={() => setActivePanelId(panel.id)}
+                indicators={indicators}
                 syncCrosshair={sync.crosshair}
                 syncTime={sync.time}
                 syncDateRange={sync.dateRange}

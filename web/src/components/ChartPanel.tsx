@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CandlesChart, type Candle, type VisibleRange } from "./CandlesChart";
 import { StatsRow, type Stats } from "./StatsRow";
 import type { RangeKey } from "./RangeButtons";
+import { DEFAULT_INDICATORS, type IndicatorState } from "./IndicatorControls";
 
 interface ChartPanelProps {
   id: string;
@@ -11,6 +12,7 @@ interface ChartPanelProps {
   range: RangeKey;
   active: boolean;
   onClick?: () => void;
+  indicators?: IndicatorState;
   syncCrosshair?: boolean;
   syncTime?: boolean;
   syncDateRange?: boolean;
@@ -26,6 +28,7 @@ export function ChartPanel({
   range,
   active,
   onClick,
+  indicators = DEFAULT_INDICATORS,
   syncCrosshair,
   syncTime,
   syncDateRange,
@@ -116,6 +119,7 @@ export function ChartPanel({
           <CandlesChart
             ticker={ticker}
             candles={candles}
+            indicators={indicators}
             syncCrosshair={syncCrosshair}
             syncTime={syncTime}
             syncDateRange={syncDateRange}
