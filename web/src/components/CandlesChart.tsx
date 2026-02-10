@@ -506,13 +506,14 @@ export function CandlesChart({
   }, [onVisibleRangeChange, syncedVisibleRange]);
 
   // Crosshair sync: set crosshair on this chart to the synced time (same date as other charts).
-  // We do NOT scroll; we use the library's setCrosshairPosition so the crosshair is visible on all charts.
+  // Also update hover info so the OHLC bar reflects the synced time on every chart.
   useEffect(() => {
     if (!chartRef.current || !candleSeriesRef.current) return;
     const chart = chartRef.current;
 
     if (!syncCrosshair || !syncedCrosshairTime) {
       chart.clearCrosshairPosition();
+      setHoverInfo(null);
       return;
     }
 
@@ -523,8 +524,21 @@ export function CandlesChart({
         syncedCrosshairTime as string,
         candleSeriesRef.current
       );
+      const changePct =
+        candle.open != null && candle.open !== 0
+          ? ((candle.close - candle.open) / candle.open) * 100
+          : undefined;
+      setHoverInfo({
+        time: candle.time,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        changePct,
+      });
     } else {
       chart.clearCrosshairPosition();
+      setHoverInfo(null);
     }
   }, [syncCrosshair, syncedCrosshairTime, candleByTime]);
 
