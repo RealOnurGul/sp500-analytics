@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useMemo } from "react";
-import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickData } from "lightweight-charts";
+import {
+  createChart,
+  ColorType,
+  IChartApi,
+  ISeriesApi,
+  CandlestickData,
+} from "lightweight-charts";
 
 export interface Candle {
   time: string;
@@ -39,33 +45,33 @@ export function CandlesChart({ candles, className = "" }: CandlesChartProps) {
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: "#131722" },
-        textColor: "#d1d4dc",
+        background: { type: ColorType.Solid, color: "#ffffff" },
+        textColor: "#0f172a",
       },
       grid: {
-        vertLines: { color: "#2a2e39" },
-        horzLines: { color: "#2a2e39" },
+        vertLines: { color: "#e2e8f0" },
+        horzLines: { color: "#e2e8f0" },
       },
       width: containerRef.current.clientWidth,
       height: 400,
       timeScale: {
-        borderColor: "#2a2e39",
+        borderColor: "#e2e8f0",
         timeVisible: true,
         secondsVisible: false,
       },
       rightPriceScale: {
-        borderColor: "#2a2e39",
+        borderColor: "#e2e8f0",
         scaleMargins: { top: 0.1, bottom: 0.2 },
       },
     });
 
     const candlestickSeries = chart.addCandlestickSeries({
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderDownColor: "#ef5350",
-      borderUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
-      wickUpColor: "#26a69a",
+      upColor: "#16a34a",
+      downColor: "#dc2626",
+      borderDownColor: "#dc2626",
+      borderUpColor: "#16a34a",
+      wickDownColor: "#dc2626",
+      wickUpColor: "#16a34a",
     });
     if (candleData.length > 0) {
       candlestickSeries.setData(candleData);
