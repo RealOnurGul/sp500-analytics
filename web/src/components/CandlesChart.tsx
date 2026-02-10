@@ -15,10 +15,12 @@ import {
 import type { IndicatorState } from "./IndicatorControls";
 import {
   ema,
+  vwap as vwapCalc,
   bollingerBands,
   parabolicSAR,
   sarFlipMarkers,
   ema8SlopeRegime,
+  confirmedRegimeFromEma8,
   EMA_RIBBON_PERIODS,
   RIBBON_OPACITIES,
   EMA_50_PERIOD,
@@ -66,6 +68,25 @@ function toRibbonLineData(
       r === "bullish"
         ? `rgba(124, 58, 237, ${opacity})` // purple/blue
         : `rgba(220, 38, 127, ${opacity})`; // red/magenta
+    out.push({ time: times[i] as string, value: values[i]!, color });
+  }
+  return out;
+}
+
+/** VWAP line: same bullish/bearish colors as ribbon, opacity 1.0. */
+function toVwapLineData(
+  times: string[],
+  values: (number | null)[],
+  regime: ("bullish" | "bearish")[]
+): LineData[] {
+  const out: LineData[] = [];
+  for (let i = 0; i < times.length; i++) {
+    if (values[i] == null || Number.isNaN(values[i]!)) continue;
+    const r = regime[i];
+    const color =
+      r === "bullish"
+        ? "rgba(124, 58, 237, 1)"
+        : "rgba(220, 38, 127, 1)";
     out.push({ time: times[i] as string, value: values[i]!, color });
   }
   return out;
@@ -136,6 +157,7 @@ export function CandlesChart({
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const ribbonSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
+  const vwapSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const ema200SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bollingerSeriesRef = useRef<{ upper: ISeriesApi<"Line">; middle: ISeriesApi<"Line">; lower: ISeriesApi<"Line"> } | null>(null);
@@ -196,16 +218,20 @@ export function CandlesChart({
     };
   }, [candles]);
 
-  const ind = indicators ?? { emaRibbon: false, ema50: true, ema200: true, bollinger: false, sar: false, buySellMarkers: false };
+  const ind = indicators ?? { emaRibbon: false, ema50: true, ema200: true, vwap: false, bollinger: false, sar: false, buySellMarkers: false };
   const indicatorData = useMemo(() => {
     if (candles.length === 0) return null;
     const close = candles.map((c) => c.close);
     const high = candles.map((c) => c.high);
     const low = candles.map((c) => c.low);
+    const volume = candles.map((c) => c.volume);
     const times = candles.map((c) => c.time);
     const sarValues = (ind.sar || ind.buySellMarkers) ? parabolicSAR(high, low, close) : null;
-    const ema8 = ind.emaRibbon ? ema(close, 8) : null;
+    const needRegime = ind.emaRibbon || ind.vwap;
+    const ema8 = needRegime ? ema(close, 8) : null;
     const regime = ema8 ? ema8SlopeRegime(ema8) : null;
+    const vwapConfirmedRegime = ind.vwap && ema8 ? confirmedRegimeFromEma8(ema8) : null;
+    const vwapValues = ind.vwap ? vwapCalc(high, low, close, volume) : null;
     return {
       times,
       ribbon:
@@ -213,6 +239,10 @@ export function CandlesChart({
           ? EMA_RIBBON_PERIODS.map((p, lineIndex) =>
               toRibbonLineData(times, ema(close, p), regime, lineIndex)
             )
+          : [],
+      vwap:
+        ind.vwap && vwapConfirmedRegime && vwapValues
+          ? toVwapLineData(times, vwapValues, vwapConfirmedRegime)
           : [],
       ema50: ind.ema50 ? toLineData(times, ema(close, EMA_50_PERIOD)) : [],
       ema200: ind.ema200 ? toLineData(times, ema(close, EMA_200_PERIOD)) : [],
@@ -223,7 +253,10 @@ export function CandlesChart({
           ? sarFlipMarkers(high, low, close, sarValues)
           : null,
     };
-  }, [candles, ind.emaRibbon, ind.ema50, ind.ema200, ind.bollinger, ind.sar, ind.buySellMarkers]);
+  }, [
+    candles,
+    `${ind.emaRibbon}-${ind.ema50}-${ind.ema200}-${ind.vwap}-${ind.bollinger}-${ind.sar}-${ind.buySellMarkers}`,
+  ]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -301,6 +334,7 @@ export function CandlesChart({
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
       ribbonSeriesRef.current = [];
+      vwapSeriesRef.current = null;
       ema50SeriesRef.current = null;
       ema200SeriesRef.current = null;
       bollingerSeriesRef.current = null;
@@ -327,7 +361,7 @@ export function CandlesChart({
     const candleSeries = candleSeriesRef.current;
     if (!chart || !candleSeries || !indicatorData || candleData.length === 0) return;
 
-    const { times, ribbon, ema50, ema200, bollinger, sar, markers } = indicatorData;
+    const { times, ribbon, vwap: vwapData, ema50, ema200, bollinger, sar, markers } = indicatorData;
 
     // EMA Ribbon (slope-based regime color, opacity gradient, EMA8 thicker)
     if (ind.emaRibbon) {
@@ -346,6 +380,24 @@ export function CandlesChart({
     } else {
       ribbonSeriesRef.current.forEach((s) => chart.removeSeries(s));
       ribbonSeriesRef.current = [];
+    }
+
+    // VWAP (above ribbon, same regime colors, bold line)
+    if (ind.vwap) {
+      if (!vwapSeriesRef.current) {
+        vwapSeriesRef.current = chart.addLineSeries({
+          color: "rgba(124, 58, 237, 1)",
+          lineWidth: 3,
+          priceLineVisible: false,
+          lastValueVisible: true,
+        });
+      }
+      vwapSeriesRef.current.setData(vwapData);
+    } else {
+      if (vwapSeriesRef.current) {
+        chart.removeSeries(vwapSeriesRef.current);
+        vwapSeriesRef.current = null;
+      }
     }
 
     // EMA 50
@@ -457,7 +509,11 @@ export function CandlesChart({
     } else {
       candleSeries.setMarkers([]);
     }
-  }, [candleData.length, indicatorData, ind.emaRibbon, ind.ema50, ind.ema200, ind.bollinger, ind.sar, ind.buySellMarkers]);
+  }, [
+    candleData.length,
+    indicatorData,
+    `${ind.emaRibbon}-${ind.ema50}-${ind.ema200}-${ind.vwap}-${ind.bollinger}-${ind.sar}-${ind.buySellMarkers}`,
+  ]);
 
   // Apply layout for volume pane height (price chart stays stable)
   useEffect(() => {

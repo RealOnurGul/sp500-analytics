@@ -10,6 +10,9 @@ export const EMA_200_PERIOD = 200;
 /** Opacity for each ribbon line (index 0 = EMA 8 most visible, 6 = EMA 144 least visible). */
 export const RIBBON_OPACITIES = [0.9, 0.78, 0.65, 0.52, 0.38, 0.25, 0.15] as const;
 
+/** Bars required in a row before confirmed trend flips (VWAP smoothing). */
+export const TREND_CONFIRM_BARS = 3;
+
 /**
  * Option A: Trend regime from slope of EMA 8.
  * Bullish if EMA8[t] > EMA8[t-1], bearish if <; if equal, keep previous to avoid flicker.
@@ -25,6 +28,82 @@ export function ema8SlopeRegime(ema8: (number | null)[]): ("bullish" | "bearish"
       else if (curr < prevVal) prev = "bearish";
     }
     out[i] = prev;
+  }
+  return out;
+}
+
+/**
+ * Confirmed trend with hysteresis: only flip when rawTrend has stayed opposite
+ * for TREND_CONFIRM_BARS consecutive bars. Used for VWAP to avoid striped/blocky coloring.
+ */
+export function confirmedRegimeFromEma8(
+  ema8: (number | null)[],
+  confirmBars: number = TREND_CONFIRM_BARS
+): ("bullish" | "bearish")[] {
+  const n = ema8.length;
+  const rawTrend: (1 | -1)[] = new Array(n);
+  rawTrend[0] = 1;
+  for (let i = 1; i < n; i++) {
+    const curr = ema8[i];
+    const prevVal = ema8[i - 1];
+    if (curr != null && prevVal != null) {
+      if (curr > prevVal) rawTrend[i] = 1;
+      else if (curr < prevVal) rawTrend[i] = -1;
+      else rawTrend[i] = rawTrend[i - 1];
+    } else {
+      rawTrend[i] = rawTrend[i - 1];
+    }
+  }
+
+  const confirmed: ("bullish" | "bearish")[] = new Array(n);
+  confirmed[0] = rawTrend[0] === 1 ? "bullish" : "bearish";
+  for (let i = 1; i < n; i++) {
+    const prevConfirmed = confirmed[i - 1] === "bullish" ? 1 : -1;
+    if (rawTrend[i] === prevConfirmed) {
+      confirmed[i] = confirmed[i - 1];
+    } else {
+      let count = 0;
+      for (let j = i; j >= 0 && rawTrend[j] === rawTrend[i]; j--) {
+        count++;
+      }
+      if (count >= confirmBars) {
+        confirmed[i] = rawTrend[i] === 1 ? "bullish" : "bearish";
+      } else {
+        confirmed[i] = confirmed[i - 1];
+      }
+    }
+  }
+  return confirmed;
+}
+
+/**
+ * Session-based VWAP: cumulative (typical price * volume) / cumulative volume.
+ * Typical price = (H + L + C) / 3 when OHLC exists, else close.
+ * Resets at the start of the dataset (first bar is first point with volume).
+ */
+export function vwap(
+  high: number[],
+  low: number[],
+  close: number[],
+  volume: number[]
+): (number | null)[] {
+  const len = high.length;
+  const out: (number | null)[] = new Array(len);
+  let cumTpV = 0;
+  let cumV = 0;
+  for (let i = 0; i < len; i++) {
+    const v = volume[i] ?? 0;
+    if (v <= 0) {
+      out[i] = i > 0 ? out[i - 1] : null;
+      continue;
+    }
+    const tp =
+      high[i] != null && low[i] != null && close[i] != null
+        ? (high[i]! + low[i]! + close[i]!) / 3
+        : close[i] ?? 0;
+    cumTpV += tp * v;
+    cumV += v;
+    out[i] = cumV > 0 ? cumTpV / cumV : null;
   }
   return out;
 }

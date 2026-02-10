@@ -6,6 +6,7 @@ export interface IndicatorState {
   emaRibbon: boolean;
   ema50: boolean;
   ema200: boolean;
+  vwap: boolean;
   bollinger: boolean;
   sar: boolean;
   buySellMarkers: boolean;
@@ -15,6 +16,7 @@ export const DEFAULT_INDICATORS: IndicatorState = {
   emaRibbon: false,
   ema50: true,
   ema200: true,
+  vwap: false,
   bollinger: false,
   sar: false,
   buySellMarkers: false,
@@ -24,6 +26,7 @@ const LABELS: { key: keyof IndicatorState; label: string }[] = [
   { key: "emaRibbon", label: "EMA Ribbon (8–144)" },
   { key: "ema50", label: "EMA 50" },
   { key: "ema200", label: "EMA 200" },
+  { key: "vwap", label: "VWAP" },
   { key: "bollinger", label: "Bollinger Bands" },
   { key: "sar", label: "Parabolic SAR" },
   { key: "buySellMarkers", label: "Buy / Sell markers" },
@@ -85,8 +88,10 @@ export function IndicatorControls({
             >
               <input
                 type="checkbox"
-                checked={indicators[key]}
-                onChange={(e) => onChange({ ...indicators, [key]: e.target.checked })}
+                checked={Boolean(indicators[key])}
+                onChange={(e) =>
+                  onChange({ ...DEFAULT_INDICATORS, ...indicators, [key]: e.target.checked })
+                }
                 className="h-4 w-4 rounded border-[var(--border)]"
               />
               <span>{label}</span>
