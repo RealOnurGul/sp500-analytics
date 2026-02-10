@@ -9,7 +9,6 @@ export interface IndicatorState {
   vwap: boolean;
   bollinger: boolean;
   sar: boolean;
-  buySellMarkers: boolean;
 }
 
 export const DEFAULT_INDICATORS: IndicatorState = {
@@ -19,7 +18,6 @@ export const DEFAULT_INDICATORS: IndicatorState = {
   vwap: false,
   bollinger: false,
   sar: false,
-  buySellMarkers: false,
 };
 
 const LABELS: { key: keyof IndicatorState; label: string }[] = [
@@ -29,7 +27,6 @@ const LABELS: { key: keyof IndicatorState; label: string }[] = [
   { key: "vwap", label: "VWAP" },
   { key: "bollinger", label: "Bollinger Bands" },
   { key: "sar", label: "Parabolic SAR" },
-  { key: "buySellMarkers", label: "Buy / Sell markers" },
 ];
 
 interface IndicatorControlsProps {
