@@ -20,10 +20,26 @@ export interface Candle {
   volume: number;
 }
 
+export interface VisibleRange {
+  from: number;
+  to: number;
+}
+
 interface CandlesChartProps {
   ticker?: string;
   candles: Candle[];
   className?: string;
+  /** Sync: report crosshair time when user moves crosshair */
+  onCrosshairMove?: (time: string) => void;
+  /** Sync: report visible range when user scrolls/zooms */
+  onVisibleRangeChange?: (range: VisibleRange) => void;
+  /** Sync: when set, scroll this chart to show this time (crosshair sync) */
+  syncedCrosshairTime?: string | null;
+  /** Sync: when set, apply this visible range (time/date range sync) */
+  syncedVisibleRange?: VisibleRange | null;
+  syncCrosshair?: boolean;
+  syncTime?: boolean;
+  syncDateRange?: boolean;
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -46,14 +62,25 @@ function formatNum(value: number | undefined, decimals = 2): string {
   });
 }
 
-export function CandlesChart({ ticker, candles, className = "" }: CandlesChartProps) {
+export function CandlesChart({
+  ticker,
+  candles,
+  className = "",
+  onCrosshairMove,
+  onVisibleRangeChange,
+  syncedCrosshairTime,
+  syncedVisibleRange,
+  syncCrosshair = false,
+  syncTime = false,
+  syncDateRange = false,
+}: CandlesChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const skipVisibleRangeRef = useRef(false);
 
   const [showVolume, setShowVolume] = useState(true);
-  // Fraction of chart height used for the volume pane at the bottom
   const [volumeHeight, setVolumeHeight] = useState(0.25);
 
   const isDraggingRef = useRef(false);
@@ -110,7 +137,11 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const chart = createChart(containerRef.current, {
+    const el = containerRef.current;
+    const w = el.clientWidth || 400;
+    const h = Math.max(200, el.clientHeight || 400);
+
+    const chart = createChart(el, {
       layout: {
         background: { type: ColorType.Solid, color: "#ffffff" },
         textColor: "#0f172a",
@@ -122,8 +153,8 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
         vertLines: { color: "#e2e8f0" },
         horzLines: { color: "#e2e8f0" },
       },
-      width: containerRef.current.clientWidth,
-      height: 400,
+      width: w,
+      height: h,
       timeScale: {
         borderColor: "#e2e8f0",
         timeVisible: true,
@@ -134,6 +165,17 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
         scaleMargins: { top: 0.1, bottom: 0.2 },
       },
     });
+
+    const applySize = () => {
+      if (!containerRef.current || !chartRef.current) return;
+      const width = containerRef.current.clientWidth;
+      const height = Math.max(200, containerRef.current.clientHeight);
+      chartRef.current.applyOptions({ width, height });
+    };
+
+    const ro = new ResizeObserver(applySize);
+    ro.observe(el);
+    window.addEventListener("resize", applySize);
 
     const candlestickSeries = chart.addCandlestickSeries({
       upColor: "#16a34a",
@@ -160,17 +202,9 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
     candleSeriesRef.current = candlestickSeries;
     volumeSeriesRef.current = volumeSeries;
 
-    const handleResize = () => {
-      if (containerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: containerRef.current.clientWidth,
-        });
-      }
-    };
-    window.addEventListener("resize", handleResize);
-
     return () => {
-      window.removeEventListener("resize", handleResize);
+      ro.disconnect();
+      window.removeEventListener("resize", applySize);
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
@@ -219,17 +253,15 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
     });
   }, [showVolume, volumeHeight]);
 
-  // Crosshair move: update hover info without recreating chart
+  // Crosshair move: update hover info and optionally report for sync
   useEffect(() => {
     if (!chartRef.current) return;
     const chart = chartRef.current;
 
     const handler = (param: any) => {
-      // If we are not over a candle, keep the last hovered value
-      if (!param || !param.time) {
-        return;
-      }
+      if (!param || !param.time) return;
       const time = String(param.time);
+      onCrosshairMove?.(time);
       const candle = candleByTime.get(time);
       if (!candle) {
         setHoverInfo(null);
@@ -250,10 +282,60 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
     };
 
     chart.subscribeCrosshairMove(handler);
-    return () => {
-      chart.unsubscribeCrosshairMove(handler);
+    return () => chart.unsubscribeCrosshairMove(handler);
+  }, [candleByTime, onCrosshairMove]);
+
+  // Subscribe to visible range change for Time/Date range sync
+  useEffect(() => {
+    if (!chartRef.current || (!onVisibleRangeChange && !syncedVisibleRange)) return;
+    const chart = chartRef.current;
+
+    const handler = (range: { from: number; to: number } | null) => {
+      if (skipVisibleRangeRef.current || !range) return;
+      onVisibleRangeChange?.({ from: range.from, to: range.to });
     };
-  }, [candleByTime]);
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
+    return () => chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+  }, [onVisibleRangeChange, syncedVisibleRange]);
+
+  // Crosshair sync: set crosshair on this chart to the synced time (same date as other charts).
+  // We do NOT scroll; we use the library's setCrosshairPosition so the crosshair is visible on all charts.
+  useEffect(() => {
+    if (!chartRef.current || !candleSeriesRef.current) return;
+    const chart = chartRef.current;
+
+    if (!syncCrosshair || !syncedCrosshairTime) {
+      chart.clearCrosshairPosition();
+      return;
+    }
+
+    const candle = candleByTime.get(syncedCrosshairTime);
+    if (candle != null) {
+      chart.setCrosshairPosition(
+        candle.close,
+        syncedCrosshairTime as string,
+        candleSeriesRef.current
+      );
+    } else {
+      chart.clearCrosshairPosition();
+    }
+  }, [syncCrosshair, syncedCrosshairTime, candleByTime]);
+
+  // Apply synced visible range (Time / Date range sync)
+  useEffect(() => {
+    if (
+      (!syncTime && !syncDateRange) ||
+      !syncedVisibleRange ||
+      !chartRef.current
+    )
+      return;
+    skipVisibleRangeRef.current = true;
+    chartRef.current.timeScale().setVisibleLogicalRange(syncedVisibleRange);
+    setTimeout(() => {
+      skipVisibleRangeRef.current = false;
+    }, 50);
+  }, [syncTime, syncDateRange, syncedVisibleRange]);
 
   const handleDragStart = useCallback((event: React.MouseEvent) => {
     if (!showVolume) return;
@@ -291,7 +373,7 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
       : "text-[var(--text-muted)]";
 
   return (
-    <div className={className}>
+    <div className={`flex min-h-0 flex-1 flex-col ${className}`}>
       {info && (
         <div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-[var(--text)]">
           <span className="font-semibold">{ticker}</span>
@@ -330,11 +412,7 @@ export function CandlesChart({ ticker, candles, className = "" }: CandlesChartPr
           {showVolume ? "Hide volume" : "Show volume"}
         </button>
       </div>
-      <div
-        ref={containerRef}
-        className="relative w-full"
-        style={{ height: 400 }}
-      >
+      <div ref={containerRef} className="relative min-h-[200px] w-full flex-1">
         {showVolume && (
           <div
             className="absolute left-0 right-0 h-1 cursor-row-resize bg-[var(--border)]/70"

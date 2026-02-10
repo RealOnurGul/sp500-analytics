@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RangeButtons, type RangeKey } from "@/components/RangeButtons";
 import type { TickerOption } from "@/components/SearchTicker";
 import { SearchOverlay } from "@/components/SearchOverlay";
 import { LeftSidebar } from "@/components/LeftSidebar";
 import { ChartPanel } from "@/components/ChartPanel";
 import { Watchlist } from "@/components/Watchlist";
+import { SyncControls, type SyncState } from "@/components/SyncControls";
 import {
   LayoutSelector,
   type LayoutKey,
@@ -37,6 +38,19 @@ export default function Home() {
   const [searchInitialQuery, setSearchInitialQuery] = useState("");
   const [searchMode, setSearchMode] = useState<"chart" | "watchlist">("chart");
   const pendingWatchlistAdd = useRef<((ticker: string) => void) | null>(null);
+
+  const [sync, setSync] = useState<SyncState>({
+    symbol: false,
+    interval: true,
+    crosshair: false,
+    time: false,
+    dateRange: false,
+  });
+  const [sharedCrosshairTime, setSharedCrosshairTime] = useState<string | null>(null);
+  const [sharedVisibleRange, setSharedVisibleRange] = useState<{
+    from: number;
+    to: number;
+  } | null>(null);
 
   const panelCount = panelCountForLayout(layout);
 
@@ -105,11 +119,24 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handler);
   }, [searchOpen]);
 
-  const setActivePanelTicker = (ticker: string) => {
-    setPanels((prev) =>
-      prev.map((p) => (p.id === activePanelId ? { ...p, ticker } : p))
-    );
-  };
+  const setActivePanelTicker = useCallback(
+    (ticker: string) => {
+      setPanels((prev) =>
+        sync.symbol
+          ? prev.map((p) => ({ ...p, ticker }))
+          : prev.map((p) => (p.id === activePanelId ? { ...p, ticker } : p))
+      );
+    },
+    [activePanelId, sync.symbol]
+  );
+
+  const onCrosshairMove = useCallback((time: string) => {
+    setSharedCrosshairTime(time);
+  }, []);
+
+  const onVisibleRangeChange = useCallback((range: { from: number; to: number }) => {
+    setSharedVisibleRange(range);
+  }, []);
 
   const openSearch = (mode: "chart" | "watchlist") => {
     setSearchMode(mode);
@@ -127,6 +154,7 @@ export default function Home() {
           {/* Top bar */}
           <header className="flex shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
             <LayoutSelector value={layout} onChange={setLayout} />
+            <SyncControls sync={sync} onChange={setSync} />
             <div className="flex-1" />
           </header>
 
@@ -145,6 +173,17 @@ export default function Home() {
                 range={range}
                 active={panel.id === activePanelId}
                 onClick={() => setActivePanelId(panel.id)}
+                syncCrosshair={sync.crosshair}
+                syncTime={sync.time}
+                syncDateRange={sync.dateRange}
+                syncedCrosshairTime={sync.crosshair ? sharedCrosshairTime : null}
+                syncedVisibleRange={
+                  sync.time || sync.dateRange ? sharedVisibleRange : null
+                }
+                onCrosshairMove={sync.crosshair ? onCrosshairMove : undefined}
+                onVisibleRangeChange={
+                  sync.time || sync.dateRange ? onVisibleRangeChange : undefined
+                }
               />
             ))}
           </div>

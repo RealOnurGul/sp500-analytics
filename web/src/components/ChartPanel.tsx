@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CandlesChart, type Candle } from "./CandlesChart";
+import { CandlesChart, type Candle, type VisibleRange } from "./CandlesChart";
 import { StatsRow, type Stats } from "./StatsRow";
 import type { RangeKey } from "./RangeButtons";
 
@@ -11,9 +11,29 @@ interface ChartPanelProps {
   range: RangeKey;
   active: boolean;
   onClick?: () => void;
+  syncCrosshair?: boolean;
+  syncTime?: boolean;
+  syncDateRange?: boolean;
+  syncedCrosshairTime?: string | null;
+  syncedVisibleRange?: VisibleRange | null;
+  onCrosshairMove?: (time: string) => void;
+  onVisibleRangeChange?: (range: VisibleRange) => void;
 }
 
-export function ChartPanel({ id: _id, ticker, range, active, onClick }: ChartPanelProps) {
+export function ChartPanel({
+  id: _id,
+  ticker,
+  range,
+  active,
+  onClick,
+  syncCrosshair,
+  syncTime,
+  syncDateRange,
+  syncedCrosshairTime,
+  syncedVisibleRange,
+  onCrosshairMove,
+  onVisibleRangeChange,
+}: ChartPanelProps) {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,17 +108,29 @@ export function ChartPanel({ id: _id, ticker, range, active, onClick }: ChartPan
       )}
 
       {loading ? (
-        <div className="flex h-[300px] items-center justify-center text-[var(--text-muted)]">
+        <div className="flex min-h-[200px] flex-1 items-center justify-center text-[var(--text-muted)]">
           Loading...
         </div>
       ) : ticker && candles.length > 0 ? (
-        <CandlesChart ticker={ticker} candles={candles} />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <CandlesChart
+            ticker={ticker}
+            candles={candles}
+            syncCrosshair={syncCrosshair}
+            syncTime={syncTime}
+            syncDateRange={syncDateRange}
+            syncedCrosshairTime={syncedCrosshairTime}
+            syncedVisibleRange={syncedVisibleRange}
+            onCrosshairMove={onCrosshairMove}
+            onVisibleRangeChange={onVisibleRangeChange}
+          />
+        </div>
       ) : ticker ? (
-        <div className="flex h-[300px] items-center justify-center text-[var(--text-muted)]">
+        <div className="flex min-h-[200px] flex-1 items-center justify-center text-[var(--text-muted)]">
           No chart data for this range.
         </div>
       ) : (
-        <div className="flex h-[300px] items-center justify-center text-[var(--text-muted)]">
+        <div className="flex min-h-[200px] flex-1 items-center justify-center text-[var(--text-muted)]">
           Select a ticker for this panel.
         </div>
       )}
