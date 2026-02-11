@@ -187,7 +187,7 @@ export function CandlesChart({
       candles.map((c) => ({
         time: c.time as string,
         value: c.volume,
-        color: c.close >= c.open ? "#16a34a" : "#dc2626",
+        color: c.close >= c.open ? "rgba(10, 153, 129, 0.8)" : "rgba(242, 53, 69, 0.8)",
       })),
     [candles]
   );
@@ -297,12 +297,12 @@ export function CandlesChart({
     window.addEventListener("resize", applySize);
 
     const candlestickSeries = chart.addCandlestickSeries({
-      upColor: "#16a34a",
-      downColor: "#dc2626",
-      borderDownColor: "#dc2626",
-      borderUpColor: "#16a34a",
-      wickDownColor: "#dc2626",
-      wickUpColor: "#16a34a",
+      upColor: "#0A9981",
+      downColor: "#F23545",
+      borderDownColor: "#F23545",
+      borderUpColor: "#0A9981",
+      wickDownColor: "#F23545",
+      wickUpColor: "#0A9981",
     });
 
     const volumeSeries = chart.addHistogramSeries({
@@ -338,9 +338,20 @@ export function CandlesChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chart created once on mount; data updated in separate effects
   }, []);
 
+  // Candlestick colors (re-apply so they stick in lightweight-charts v4)
+  const candleColors = {
+    upColor: "#0A9981",
+    downColor: "#F23545",
+    borderUpColor: "#0A9981",
+    borderDownColor: "#F23545",
+    wickUpColor: "#0A9981",
+    wickDownColor: "#F23545",
+  };
+
   // Update series data when candles change
   useEffect(() => {
     if (!candleSeriesRef.current || candleData.length === 0) return;
+    candleSeriesRef.current.applyOptions(candleColors);
     candleSeriesRef.current.setData(candleData);
 
     if (volumeSeriesRef.current && volumeData.length > 0) {
