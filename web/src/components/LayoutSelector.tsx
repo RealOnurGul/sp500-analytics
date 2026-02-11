@@ -83,8 +83,8 @@ export function LayoutSelector({ value, onChange, className = "" }: LayoutSelect
         </svg>
       </button>
       {open && (
-        <div className="chart-dropdown absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-md border border-[var(--border)] bg-[var(--surface)] py-2 shadow-lg">
-          <div className="grid grid-cols-3 gap-1 px-2">
+        <div className="chart-dropdown absolute left-0 top-full z-50 mt-1 w-[320px] rounded-md border border-[var(--border)] bg-[var(--surface)] py-2 shadow-lg">
+          <div className="grid grid-cols-3 gap-2 px-3">
             {LAYOUT_OPTIONS.map((opt) => (
               <button
                 key={opt.key}
@@ -93,7 +93,7 @@ export function LayoutSelector({ value, onChange, className = "" }: LayoutSelect
                   onChange(opt.key);
                   setOpen(false);
                 }}
-                className={`flex flex-col items-center gap-0.5 rounded p-2 text-[10px] transition ${
+                className={`flex min-w-0 flex-col items-center gap-1 rounded p-2 text-[10px] transition ${
                   value === opt.key
                     ? "bg-[var(--accent)] text-[var(--accent-fg)]"
                     : "text-[var(--text)] hover:bg-[var(--hover)]"
@@ -101,7 +101,7 @@ export function LayoutSelector({ value, onChange, className = "" }: LayoutSelect
                 title={opt.label}
               >
                 <LayoutIcon layout={opt.key} />
-                <span className="truncate">{opt.label}</span>
+                <span className="min-w-0 truncate w-full text-center">{opt.label}</span>
               </button>
             ))}
           </div>
