@@ -2,10 +2,18 @@ import { NextRequest } from "next/server";
 import path from "path";
 import fs from "fs";
 import Papa from "papaparse";
+import { getDataDir } from "@/lib/data-path";
 
-const REPO_DATA = path.join(process.cwd(), "..", "data");
-const TICKERS_PATH = path.join(REPO_DATA, "meta", "sp500_tickers.csv");
-const PRICES_DIR = path.join(REPO_DATA, "prices");
+function getPaths() {
+  const repoData = getDataDir();
+  const metaDir = path.join(repoData, "meta");
+  return {
+    SP500_TICKERS_PATH: path.join(metaDir, "sp500_tickers.csv"),
+    EXTRAS_TICKERS_PATH: path.join(metaDir, "extras_tickers.csv"),
+    PRICES_SP500_DIR: path.join(repoData, "prices", "sp500"),
+    PRICES_EXTRAS_DIR: path.join(repoData, "prices", "extras"),
+  };
+}
 
 type RangeKey = "1M" | "3M" | "6M" | "1Y" | "5Y" | "MAX";
 
@@ -19,22 +27,70 @@ const RANGE_DAYS: Record<RangeKey, number | null> = {
 };
 
 let cachedTickerSet: Set<string> | null = null;
+let cachedMetaTime = 0;
 
 function normalizeTicker(s: string): string {
   return String(s).replace(/\./g, "-").trim();
 }
 
+let cachedExtrasSectorMap: Map<string, string> | null = null;
+
 function loadTickerSet(): Set<string> {
-  if (cachedTickerSet) return cachedTickerSet;
-  const raw = fs.readFileSync(TICKERS_PATH, "utf-8");
-  const parsed = Papa.parse<Record<string, string>>(raw, { header: true });
+  const paths = getPaths();
+  const mtime = (p: string) => (fs.existsSync(p) ? fs.statSync(p).mtimeMs : 0);
+  const nowMeta = Math.max(mtime(paths.SP500_TICKERS_PATH), mtime(paths.EXTRAS_TICKERS_PATH));
+  if (cachedTickerSet && nowMeta <= cachedMetaTime) return cachedTickerSet;
+  cachedTickerSet = null;
+  cachedExtrasSectorMap = null;
+  cachedMetaTime = nowMeta;
+  const { SP500_TICKERS_PATH, EXTRAS_TICKERS_PATH } = paths;
   const tickers = new Set<string>();
-  for (const r of parsed.data) {
-    const t = normalizeTicker(r.ticker ?? r.Symbol ?? "");
-    if (t) tickers.add(t);
+  if (fs.existsSync(SP500_TICKERS_PATH)) {
+    const raw = fs.readFileSync(SP500_TICKERS_PATH, "utf-8");
+    const parsed = Papa.parse<Record<string, string>>(raw, { header: true });
+    for (const r of parsed.data) {
+      const t = normalizeTicker(r.ticker ?? r.Symbol ?? "");
+      if (t) tickers.add(t);
+    }
+  }
+  if (fs.existsSync(EXTRAS_TICKERS_PATH)) {
+    const raw = fs.readFileSync(EXTRAS_TICKERS_PATH, "utf-8");
+    const parsed = Papa.parse<Record<string, string>>(raw, { header: true });
+    for (const r of parsed.data) {
+      const t = normalizeTicker(r.ticker ?? "");
+      if (t) tickers.add(t);
+    }
   }
   cachedTickerSet = tickers;
   return tickers;
+}
+
+function loadExtrasSectorMap(): Map<string, string> {
+  if (cachedExtrasSectorMap) return cachedExtrasSectorMap;
+  const { EXTRAS_TICKERS_PATH } = getPaths();
+  const map = new Map<string, string>();
+  if (fs.existsSync(EXTRAS_TICKERS_PATH)) {
+    const raw = fs.readFileSync(EXTRAS_TICKERS_PATH, "utf-8");
+    const parsed = Papa.parse<Record<string, string>>(raw, { header: true });
+    for (const r of parsed.data) {
+      const t = normalizeTicker(r.ticker ?? "");
+      if (t && r.sector) map.set(t, r.sector);
+    }
+  }
+  cachedExtrasSectorMap = map;
+  return map;
+}
+
+function resolvePricePath(normalizedTicker: string): string | null {
+  const { PRICES_SP500_DIR, PRICES_EXTRAS_DIR } = getPaths();
+  const sp500Path = path.join(PRICES_SP500_DIR, `${normalizedTicker}.csv`);
+  if (fs.existsSync(sp500Path)) return sp500Path;
+  const sector = loadExtrasSectorMap().get(normalizedTicker);
+  if (sector) {
+    const extrasPath = path.join(PRICES_EXTRAS_DIR, sector, `${normalizedTicker}.csv`);
+    if (fs.existsSync(extrasPath)) return extrasPath;
+  }
+  return null;
 }
 
 const pricesCache = new Map<string, { data: PricesResponse; ts: number }>();
@@ -103,8 +159,8 @@ export async function GET(request: NextRequest) {
     if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
       return Response.json(cached.data);
     }
-    const filePath = path.join(PRICES_DIR, `${normalized}.csv`);
-    if (!fs.existsSync(filePath)) {
+    const filePath = resolvePricePath(normalized);
+    if (!filePath) {
       return Response.json(
         { error: "No price data for this ticker" },
         { status: 404 }

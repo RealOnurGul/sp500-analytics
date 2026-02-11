@@ -33,6 +33,7 @@ export function Watchlist({ onSelectTicker, onRequestSearchForAdd }: WatchlistPr
       id: "stocks",
       name: "Stocks",
       items: [
+        { id: "shop", ticker: "SHOP" },
         { id: "aapl", ticker: "AAPL" },
         { id: "amzn", ticker: "AMZN" },
         { id: "nvda", ticker: "NVDA" },

@@ -45,10 +45,11 @@ def main() -> None:
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir).resolve()
-    prices_dir = data_dir / "prices"
+    prices_dir = data_dir / "prices" / "sp500"
     meta_dir = data_dir / "meta"
     derived_dir = data_dir / "derived"
 
+    prices_dir.mkdir(parents=True, exist_ok=True)
     store = CsvStore(prices_dir)
     meta_store = MetaStore(meta_dir)
 

@@ -1,0 +1,53 @@
+ticker,name,sector
+TSM,Taiwan Semiconductor,ai_infra
+ASML,ASML,ai_infra
+SSNLF,Samsung Electronics,ai_infra
+ARM,Arm Holdings,ai_infra
+SNOW,Snowflake,ai_infra
+MDB,MongoDB,ai_infra
+SHOP,Shopify,ai_infra
+TCEHY,Tencent,communication_services
+BIDU,Baidu,communication_services
+SPOT,Spotify,communication_services
+ROKU,Roku,communication_services
+ZM,Zoom,communication_services
+PINS,Pinterest,communication_services
+SNAP,Snap,communication_services
+LVMUY,LVMH,consumer_discretionary
+TM,Toyota Motor,consumer_discretionary
+RACE,Ferrari,consumer_discretionary
+BNS,Bank of Nova Scotia,financials
+TD,Toronto-Dominion Bank,financials
+RY,Royal Bank of Canada,financials
+HSBC,HSBC Holdings,financials
+ALIZY,Allianz,financials
+2222-SR,Saudi Aramco,energy
+SHEL,Shell,energy
+BP,BP,energy
+TTE,TotalEnergies,energy
+E,Eni,energy
+SLB,Schlumberger,energy
+VLO,Valero Energy,energy
+PSX,Phillips 66,energy
+OXY,Occidental Petroleum,energy
+MPC,Marathon Petroleum,energy
+CNQ,Canadian Natural Resources,energy
+SU,Suncor Energy,energy
+REPYY,Repsol,energy
+EQNR,Equinor,energy
+NSRGY,Nestlé,consumer_staples
+UL,Unilever,consumer_staples
+MDLZ,Mondelez,consumer_staples
+KR,Kroger,consumer_staples
+DANOY,Danone,consumer_staples
+OR-PA,L'Oreal,consumer_staples
+HRL,Hormel Foods,consumer_staples
+RR-L,Rolls-Royce Holdings,industrials
+BHP,BHP,materials
+RIO,Rio Tinto,materials
+KRC,Kilroy Realty,real_estate
+JLL,Jones Lang LaSalle,real_estate
+CWK,Cushman & Wakefield,real_estate
+NGG,National Grid,utilities
+ENLAY,Enel,utilities
+IBDRY,Iberdrola,utilities

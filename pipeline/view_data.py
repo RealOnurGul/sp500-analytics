@@ -39,10 +39,21 @@ def main() -> None:
         help="Show only first N rows (default: all)",
     )
     args = parser.parse_args()
-    prices_dir = Path(args.data_dir).resolve() / "prices"
-    store = CsvStore(prices_dir)
-
-    df = store.read_ticker(args.ticker.strip().upper())
+    data_dir = Path(args.data_dir).resolve()
+    ticker = args.ticker.strip().upper().replace(".", "-")
+    # Try sp500 first, then extras (any sector)
+    sp500_dir = data_dir / "prices" / "sp500"
+    store_sp500 = CsvStore(sp500_dir)
+    df = store_sp500.read_ticker(ticker)
+    if df is None or df.empty:
+        extras_base = data_dir / "prices" / "extras"
+        if extras_base.exists():
+            for sector_dir in extras_base.iterdir():
+                if sector_dir.is_dir():
+                    store = CsvStore(sector_dir)
+                    df = store.read_ticker(ticker)
+                    if df is not None and not df.empty:
+                        break
     if df is None or df.empty:
         print(f"No data for {args.ticker}", file=sys.stderr)
         sys.exit(1)

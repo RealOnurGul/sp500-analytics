@@ -2,9 +2,15 @@ import { NextRequest } from "next/server";
 import path from "path";
 import fs from "fs";
 import Papa from "papaparse";
+import { getDataDir } from "@/lib/data-path";
 
-const REPO_DATA = path.join(process.cwd(), "..", "data");
-const TICKERS_PATH = path.join(REPO_DATA, "meta", "sp500_tickers.csv");
+function getMetaPaths() {
+  const metaDir = path.join(getDataDir(), "meta");
+  return {
+    SP500_TICKERS_PATH: path.join(metaDir, "sp500_tickers.csv"),
+    EXTRAS_TICKERS_PATH: path.join(metaDir, "extras_tickers.csv"),
+  };
+}
 
 export interface TickerMatch {
   ticker: string;
@@ -18,20 +24,44 @@ function normalizeTicker(symbol: string): string {
 }
 
 let cachedTickers: TickerMatch[] | null = null;
+let cachedTickersMetaTime = 0;
 
 function loadTickers(): TickerMatch[] {
-  if (cachedTickers) return cachedTickers;
-  const raw = fs.readFileSync(TICKERS_PATH, "utf-8");
-  const parsed = Papa.parse<Record<string, string>>(raw, { header: true });
-  const rows = parsed.data.filter((r) => r && (r.ticker || r.Symbol));
-  cachedTickers = rows.map((r) => {
-    const ticker = normalizeTicker(r.ticker ?? r.Symbol ?? "");
-    const name = r.security_name ?? r.Security ?? "";
-    const sector = r.sector ?? r["GICS Sector"] ?? "";
-    const subIndustry = r.sub_industry ?? r["GICS Sub-Industry"] ?? "";
-    return { ticker, name, sector, subIndustry };
-  });
-  return cachedTickers;
+  const { SP500_TICKERS_PATH, EXTRAS_TICKERS_PATH } = getMetaPaths();
+  const mtime = (p: string) => (fs.existsSync(p) ? fs.statSync(p).mtimeMs : 0);
+  const nowMeta = Math.max(mtime(SP500_TICKERS_PATH), mtime(EXTRAS_TICKERS_PATH));
+  if (cachedTickers && nowMeta <= cachedTickersMetaTime) return cachedTickers;
+  cachedTickers = null;
+  cachedTickersMetaTime = nowMeta;
+  const out: TickerMatch[] = [];
+  if (fs.existsSync(SP500_TICKERS_PATH)) {
+    const raw = fs.readFileSync(SP500_TICKERS_PATH, "utf-8");
+    const parsed = Papa.parse<Record<string, string>>(raw, { header: true });
+    for (const r of parsed.data) {
+      if (!r || (!r.ticker && !r.Symbol)) continue;
+      const ticker = normalizeTicker(r.ticker ?? r.Symbol ?? "");
+      if (!ticker) continue;
+      out.push({
+        ticker,
+        name: r.security_name ?? r.Security ?? "",
+        sector: r.sector ?? r["GICS Sector"] ?? "",
+        subIndustry: r.sub_industry ?? r["GICS Sub-Industry"] ?? "",
+      });
+    }
+  }
+  if (fs.existsSync(EXTRAS_TICKERS_PATH)) {
+    const raw = fs.readFileSync(EXTRAS_TICKERS_PATH, "utf-8");
+    const parsed = Papa.parse<Record<string, string>>(raw, { header: true });
+    for (const r of parsed.data) {
+      if (!r || !r.ticker) continue;
+      const ticker = normalizeTicker(r.ticker);
+      if (!ticker) continue;
+      const sector = r.sector ?? "";
+      out.push({ ticker, name: r.name ?? ticker, sector, subIndustry: sector });
+    }
+  }
+  cachedTickers = out;
+  return out;
 }
 
 export async function GET(request: NextRequest) {
