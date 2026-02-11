@@ -40,7 +40,8 @@ export function alignCloses(
   barsA: Bar[],
   barsB: Bar[]
 ): { times: string[]; closeA: number[]; closeB: number[] } {
-  return alignByDate(barsA, barsB, (b) => b.close);
+  const { times, valuesA, valuesB } = alignByDate(barsA, barsB, (b) => b.close);
+  return { times, closeA: valuesA, closeB: valuesB };
 }
 
 /**
@@ -52,7 +53,7 @@ export function alignReturns(barsA: Bar[], barsB: Bar[]): {
   rA: number[];
   rB: number[];
 } {
-  const { times, valuesA: closeA, valuesB: closeB } = alignCloses(barsA, barsB);
+  const { times, closeA, closeB } = alignCloses(barsA, barsB);
   const rA: number[] = [];
   const rB: number[] = [];
   for (let i = 0; i < times.length; i++) {

@@ -8,6 +8,7 @@ export function spreadSeries(
   closeB: number[],
   beta: number
 ): number[] {
+  if (!Array.isArray(closeA) || !Array.isArray(closeB)) return [];
   return closeA.map((a, i) => a - beta * (closeB[i] ?? 0));
 }
 
