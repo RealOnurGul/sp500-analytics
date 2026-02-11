@@ -144,7 +144,7 @@ export function SearchOverlay({
                 onClose();
               }}
               className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
-                i === highlight ? "bg-[var(--border)]" : "hover:bg-[var(--border)]/60"
+                i === highlight ? "bg-[var(--hover-blue)]" : "hover:bg-[var(--hover-blue)]"
               }`}
             >
               <div className="flex flex-col">

@@ -111,7 +111,7 @@ export function SearchTicker({
               role="option"
               aria-selected={i === highlight}
               className={`cursor-pointer px-3 py-2 text-sm ${
-                i === highlight ? "bg-[var(--border)]" : ""
+                i === highlight ? "bg-[var(--hover-blue)]" : "hover:bg-[var(--hover-blue)]"
               }`}
               onMouseEnter={() => setHighlight(i)}
               onMouseDown={(e) => {
