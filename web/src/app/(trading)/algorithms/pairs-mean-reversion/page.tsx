@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { SearchTicker } from "@/components/SearchTicker";
 import { getBars } from "@/lib/explore/data/getBars";
-import { getUniverseTickers } from "@/lib/explore/data/getUniverseTickers";
 import { filterBarsByRange } from "@/lib/explore/dateRange";
 import { runPairsMeanReversionBacktest } from "@/lib/explore/backtest/pairsMeanReversion";
 import type { Bar } from "@/lib/explore/types";
@@ -14,7 +14,6 @@ const Z_WINDOW_OPTS = [20, 60, 120];
 
 export default function PairsMeanReversionPage() {
   const searchParams = useSearchParams();
-  const [tickers, setTickers] = useState<{ ticker: string }[]>([]);
   const [tickerA, setTickerA] = useState(searchParams.get("A") || "AAPL");
   const [tickerB, setTickerB] = useState(searchParams.get("B") || "MSFT");
   const [range, setRange] = useState<RangeKey>((searchParams.get("range") as RangeKey) || "1Y");
@@ -25,10 +24,6 @@ export default function PairsMeanReversionPage() {
   const [costPerLegPct, setCostPerLegPct] = useState(0.05);
   const [result, setResult] = useState<ReturnType<typeof runPairsMeanReversionBacktest> | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    getUniverseTickers().then((t) => setTickers(t));
-  }, []);
 
   const run = useCallback(async () => {
     setLoading(true);
@@ -57,28 +52,20 @@ export default function PairsMeanReversionPage() {
       <aside className="w-64 shrink-0 border-r border-[var(--border)] bg-[var(--surface)] p-3 space-y-3 overflow-auto">
         <h2 className="text-sm font-semibold">Controls</h2>
         <div>
-          <label className="block text-xs text-[var(--text-muted)]">Ticker A</label>
-          <select
-            value={tickerA}
-            onChange={(e) => setTickerA(e.target.value)}
-            className="mt-0.5 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-sm"
-          >
-            {tickers.slice(0, 200).map((t) => (
-              <option key={t.ticker} value={t.ticker}>{t.ticker}</option>
-            ))}
-          </select>
+          <label className="block text-xs text-[var(--text-muted)] mb-1">Ticker A</label>
+          <SearchTicker
+            selectedTicker={tickerA || null}
+            onSelect={(t) => setTickerA(t)}
+            className="w-full"
+          />
         </div>
         <div>
-          <label className="block text-xs text-[var(--text-muted)]">Ticker B</label>
-          <select
-            value={tickerB}
-            onChange={(e) => setTickerB(e.target.value)}
-            className="mt-0.5 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-sm"
-          >
-            {tickers.slice(0, 200).map((t) => (
-              <option key={t.ticker} value={t.ticker}>{t.ticker}</option>
-            ))}
-          </select>
+          <label className="block text-xs text-[var(--text-muted)] mb-1">Ticker B</label>
+          <SearchTicker
+            selectedTicker={tickerB || null}
+            onSelect={(t) => setTickerB(t)}
+            className="w-full"
+          />
         </div>
         <div>
           <label className="block text-xs text-[var(--text-muted)]">Date range</label>
